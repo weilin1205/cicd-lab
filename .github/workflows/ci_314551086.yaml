@@ -33,23 +33,7 @@ jobs:
         run: npm ci
 
       - name: Run TypeScript typecheck
-        id: typecheck
-        run: npm run typecheck 2>&1 | tee typecheck.log
-
-      - name: Append typecheck summary
-        if: always()
-        run: |
-          {
-            echo "### TypeScript Typecheck — ${{ steps.typecheck.outcome == 'success' && '✅ Passed' || '❌ Failed' }}"
-            echo ""
-            if [ "${{ steps.typecheck.outcome }}" = "success" ]; then
-              echo "_No type errors._"
-            else
-              echo '```'
-              cat typecheck.log
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: npm run typecheck
 
   prettier:
     name: Prettier Check
@@ -68,23 +52,7 @@ jobs:
         run: npm ci
 
       - name: Run Prettier check
-        id: prettier
-        run: npm run format:check 2>&1 | tee prettier.log
-
-      - name: Append prettier summary
-        if: always()
-        run: |
-          {
-            echo "### Prettier Check — ${{ steps.prettier.outcome == 'success' && '✅ Passed' || '❌ Failed' }}"
-            echo ""
-            if [ "${{ steps.prettier.outcome }}" = "success" ]; then
-              echo "_All files match Prettier code style._"
-            else
-              echo '```'
-              cat prettier.log
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: npm run format:check
 
   test:
     name: Run Tests
@@ -103,34 +71,9 @@ jobs:
         run: npm ci
 
       - name: Run tests with JUnit reporter
-        id: test
         run: |
           mkdir -p reports
-          npm test -- --reporter=default --reporter=junit --outputFile.junit=reports/vitest-junit.xml 2>&1 | tee test.log
-
-      - name: Append test summary
-        if: always()
-        run: |
-          {
-            echo "### Vitest — ${{ steps.test.outcome == 'success' && '✅ Passed' || '❌ Failed' }}"
-            echo ""
-            if [ -f reports/vitest-junit.xml ]; then
-              TESTS=$(grep -oP 'tests="\K[0-9]+' reports/vitest-junit.xml | head -1)
-              FAILURES=$(grep -oP 'failures="\K[0-9]+' reports/vitest-junit.xml | head -1)
-              echo "| Total | Failures |"
-              echo "|------:|---------:|"
-              echo "| ${TESTS:-?} | ${FAILURES:-?} |"
-              echo ""
-            fi
-            if [ "${{ steps.test.outcome }}" != "success" ]; then
-              echo '<details><summary>Test output</summary>'
-              echo ''
-              echo '```'
-              tail -60 test.log
-              echo '```'
-              echo '</details>'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          npm test -- --reporter=default --reporter=junit --outputFile.junit=reports/vitest-junit.xml
 
       - name: Publish test results
         uses: dorny/test-reporter@v2
@@ -155,20 +98,18 @@ jobs:
     needs: [typecheck, prettier, test]
     if: always()
     steps:
-      - name: Write overall summary
+      - name: Write job summary
         run: |
-          {
-            echo "## CI Pipeline Overview"
-            echo ""
-            echo "| Job | Status |"
-            echo "|-----|--------|"
-            echo "| TypeScript Typecheck | ${{ needs.typecheck.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
-            echo "| Prettier Check       | ${{ needs.prettier.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
-            echo "| Tests                | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
-            echo ""
-            echo "Commit: \`${{ github.sha }}\`"
-            echo "Branch: \`${{ github.ref_name }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript Typecheck | ${{ needs.typecheck.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Prettier Check       | ${{ needs.prettier.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tests                | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if any job failed
         if: >
